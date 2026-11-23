@@ -23,10 +23,10 @@ enum SensorType {
 class SensorTypeDevice {
   final SensorType sensorType;
 
-  /// A localized device name for display in the user interface.
+  /// A device name suitable for display in the user interface.
   final String name;
 
-  /// The current exposure ISO value.
+  /// The current exposure ISO value, or 0 when unavailable on the platform.
   final num iso;
 
   /// A Boolean value that indicates whether the flash is currently available for use.
@@ -43,13 +43,6 @@ class SensorTypeDevice {
     required this.uid,
   });
 }
-
-// TODO: instead of storing SensorTypeDevice values,
-// this would be useful when CameraX will support multiple sensors.
-// store them in a list of SensorTypeDevice.
-// ex:
-// List<SensorTypeDevice> wideAngle;
-// List<SensorTypeDevice> ultraWideAngle;
 
 class SensorDeviceData {
   /// A built-in wide-angle camera.

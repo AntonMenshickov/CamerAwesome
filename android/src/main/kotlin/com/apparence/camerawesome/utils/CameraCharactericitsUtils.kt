@@ -30,10 +30,15 @@ val Size35mm = Size(36, 24)
  */
 @ExperimentalCamera2Interop
 fun Camera2CameraInfo.getSensorType(): PigeonSensorType {
-    val focalLengths =
-        this.getCameraCharacteristic(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)!!
-    val sensorSize =
-        this.getCameraCharacteristic(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE)!!
+    val focalLengths = this.getCameraCharacteristic(
+        CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS
+    ) ?: return PigeonSensorType.UNKNOWN
+    val sensorSize = this.getCameraCharacteristic(
+        CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE
+    ) ?: return PigeonSensorType.UNKNOWN
+    if (focalLengths.isEmpty() || sensorSize.bigger == 0f) {
+        return PigeonSensorType.UNKNOWN
+    }
 
     // To get valid focal length standards we have to upscale to the 35mm measurement (film standard)
     val cropFactor = Size35mm.bigger / sensorSize.bigger
