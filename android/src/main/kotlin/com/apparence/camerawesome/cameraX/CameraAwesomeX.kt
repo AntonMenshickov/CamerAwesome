@@ -13,6 +13,7 @@ import android.util.Log
 import android.util.Rational
 import android.util.Size
 import androidx.camera.camera2.Camera2Config
+import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -28,6 +29,7 @@ import com.apparence.camerawesome.buttons.PhysicalButtonsHandler
 import com.apparence.camerawesome.buttons.PlayerService
 import com.apparence.camerawesome.models.FlashMode
 import com.apparence.camerawesome.sensors.SensorOrientationListener
+import com.apparence.camerawesome.utils.getSensorType
 import com.apparence.camerawesome.utils.isMultiCamSupported
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
@@ -547,11 +549,40 @@ class CameraAwesomeX : CameraInterface, FlutterPlugin, ActivityAware {
     }
 
     override fun getFrontSensors(): List<PigeonSensorTypeDevice> {
-        TODO("Not yet implemented")
+        return getSensors(PigeonSensorPosition.FRONT)
     }
 
     override fun getBackSensors(): List<PigeonSensorTypeDevice> {
-        TODO("Not yet implemented")
+        return getSensors(PigeonSensorPosition.BACK)
+    }
+
+    @androidx.annotation.OptIn(ExperimentalCamera2Interop::class)
+    private fun getSensors(position: PigeonSensorPosition): List<PigeonSensorTypeDevice> {
+        return getCameraProvider().availableCameraInfos.mapNotNull { cameraInfo ->
+            val camera2Info = Camera2CameraInfo.from(cameraInfo)
+            val facing = camera2Info.getCameraCharacteristic(CameraCharacteristics.LENS_FACING)
+            val cameraPosition = when (facing) {
+                CameraCharacteristics.LENS_FACING_BACK -> PigeonSensorPosition.BACK
+                CameraCharacteristics.LENS_FACING_FRONT -> PigeonSensorPosition.FRONT
+                else -> PigeonSensorPosition.UNKNOWN
+            }
+            if (cameraPosition != position) {
+                return@mapNotNull null
+            }
+
+            val name = if (position == PigeonSensorPosition.BACK) {
+                "Back camera"
+            } else {
+                "Front camera"
+            }
+            PigeonSensorTypeDevice(
+                sensorType = camera2Info.getSensorType(),
+                name = "$name ${camera2Info.cameraId}",
+                iso = 0.0,
+                flashAvailable = cameraInfo.hasFlashUnit(),
+                uid = camera2Info.cameraId,
+            )
+        }
     }
 
     override fun pauseVideoRecording() {
