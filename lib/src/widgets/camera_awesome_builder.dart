@@ -25,7 +25,7 @@ typedef CameraLayoutBuilder = Widget Function(
   /// relative to the preview (inside or outside for instance)
   //Rect previewRect,
 
-  Preview preview,
+  AnalysisPreview preview,
 );
 
 /// Callback when a video or photo has been saved and user click on thumbnail
@@ -206,7 +206,7 @@ class CameraAwesomeBuilder extends StatefulWidget {
           imageAnalysisConfig: imageAnalysisConfig,
           onPreviewTapBuilder: onPreviewTapBuilder,
           onPreviewScaleBuilder: onPreviewScaleBuilder,
-          previewFit: previewFit ?? CameraPreviewFit.cover,
+          previewFit: previewFit ?? CameraPreviewFit.contain,
           previewDecoratorBuilder: previewDecoratorBuilder,
           theme: theme ?? AwesomeTheme(),
           previewPadding: previewPadding,
@@ -371,6 +371,7 @@ class _CameraWidgetBuilder extends State<CameraAwesomeBuilder>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     switch (state) {
       case AppLifecycleState.resumed:
+        _cameraContext.sensorConfig.setZoomToOneX();
         break;
       case AppLifecycleState.inactive:
       case AppLifecycleState.paused:
@@ -438,7 +439,7 @@ class _CameraWidgetBuilder extends State<CameraAwesomeBuilder>
                 child: !widget.showPreview
                     ? widget.builder(
                         snapshot.requireData,
-                        Preview.hidden(),
+                        AnalysisPreview.hidden(),
                       )
                     : AwesomeCameraPreview(
                         key: _cameraPreviewKey,
