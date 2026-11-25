@@ -30,7 +30,8 @@ import java.util.concurrent.Executor
 /// call updateLifecycle() to refresh the state
 data class CameraXState(
     private var cameraProvider: ProcessCameraProvider,
-    val textureEntries: Map<String, TextureRegistry.SurfaceTextureEntry>,
+    private val textureRegistry: TextureRegistry,
+    val textureEntries: MutableMap<String, TextureRegistry.SurfaceTextureEntry>,
 //    var cameraSelector: CameraSelector,
     var sensors: List<PigeonSensor>,
     var imageCaptures: MutableList<ImageCapture> = mutableListOf(),
@@ -53,6 +54,10 @@ data class CameraXState(
     val videoRecordingQuality: VideoRecordingQuality?,
     val videoOptions: AndroidVideoOptions?,
 ) : EventChannel.StreamHandler, SensorOrientation {
+
+    init {
+        ensureTextureEntries(sensors)
+    }
 
     var imageAnalysisBuilder: ImageAnalysisBuilder? = null
     private var imageAnalysis: ImageAnalysis? = null
@@ -89,6 +94,41 @@ data class CameraXState(
         return ContextCompat.getMainExecutor(activity)
     }
 
+    @SuppressLint("RestrictedApi")
+    private fun cameraSelector(sensor: PigeonSensor, fallbackLensFacing: Int): CameraSelector {
+        val deviceId = sensor.deviceId
+        val builder = CameraSelector.Builder()
+            .requireLensFacing(
+                if (sensor.position == PigeonSensorPosition.FRONT)
+                    CameraSelector.LENS_FACING_FRONT
+                else
+                    fallbackLensFacing
+            )
+
+        if (!deviceId.isNullOrEmpty()) {
+            builder.addCameraFilter(CameraFilter { cameraInfos ->
+                cameraInfos.filter { cameraInfo ->
+                    Camera2CameraInfo.from(cameraInfo).cameraId == deviceId
+                }
+            })
+        }
+        return builder.build()
+    }
+
+    fun ensureTextureEntries(sensors: List<PigeonSensor>) {
+        sensors.forEachIndexed { index, sensor ->
+            val cameraId = sensor.deviceId ?: index.toString()
+            if (!textureEntries.containsKey(cameraId)) {
+                textureEntries[cameraId] =
+                    textureRegistry.createSurfaceTexture()
+            }
+            textureEntries.putIfAbsent(
+                index.toString(),
+                textureEntries[cameraId]!!
+            )
+        }
+    }
+
     @SuppressLint("RestrictedApi", "UnsafeOptInUsageError")
     fun updateLifecycle(activity: Activity) {
         previews = mutableListOf()
@@ -101,8 +141,11 @@ data class CameraXState(
             for ((index, sensor) in sensors.withIndex()) {
                 val useCaseGroupBuilder = UseCaseGroup.Builder()
 
-                val cameraSelector =
-                    if (isFirst) CameraSelector.DEFAULT_BACK_CAMERA else CameraSelector.DEFAULT_FRONT_CAMERA
+                val cameraSelector = cameraSelector(
+                    sensor,
+                    if (isFirst) CameraSelector.LENS_FACING_BACK
+                    else CameraSelector.LENS_FACING_FRONT
+                )
                 // TODO Find cameraSelectors based on the sensor and the cameraProvider.availableConcurrentCameraInfos
 //                val cameraSelector = CameraSelector.Builder()
 //                    .requireLensFacing(if (sensor.position == PigeonSensorPosition.FRONT) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK)
@@ -193,8 +236,13 @@ data class CameraXState(
         } else {
             val useCaseGroupBuilder = UseCaseGroup.Builder()
             // Handle single camera
-            val cameraSelector =
-                if (sensors.first().position == PigeonSensorPosition.FRONT) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
+            val cameraSelector = cameraSelector(
+                sensors.first(),
+                if (sensors.first().position == PigeonSensorPosition.FRONT)
+                    CameraSelector.LENS_FACING_FRONT
+                else
+                    CameraSelector.LENS_FACING_BACK
+            )
             // Preview
             if (currentCaptureMode != CaptureModes.ANALYSIS_ONLY) {
                 previews!!.add(
@@ -326,8 +374,12 @@ data class CameraXState(
 //        Log.d("SurfaceProviderCamX", "Creating surface provider for $cameraId")
         return Preview.SurfaceProvider { request: SurfaceRequest ->
             val resolution = request.resolution
-            //Log.d("CameraX", "surfaceProvider -> Preview size: width=${resolution.width}, height=${resolution.height}")
-            val texture = textureEntries[cameraId]!!.surfaceTexture()
+            val textureEntry = textureEntries[cameraId] ?: textureEntries.values.firstOrNull()
+            if (textureEntry == null) {
+                request.willNotProvideSurface()
+                return@SurfaceProvider
+            }
+            val texture = textureEntry.surfaceTexture()
             texture.setDefaultBufferSize(resolution.width, resolution.height)
             val surface = Surface(texture)
             request.provideSurface(surface, executor) {
