@@ -5,6 +5,7 @@ import 'package:camerawesome/pigeon.dart';
 import 'package:camerawesome/src/orchestrator/camera_context.dart';
 import 'package:camerawesome/src/orchestrator/states/handlers/filter_handler.dart';
 import 'package:camerawesome/src/photofilters/filters/filters.dart';
+import 'package:collection/collection.dart';
 import 'package:rxdart/rxdart.dart';
 
 class PhotoFilterModel {
@@ -71,7 +72,7 @@ class PhotoCameraState extends CameraState {
     OnPhotoFailedCallback? onPhotoFailed,
   }) async {
     CaptureRequest captureRequest =
-        await filePathBuilder(sensorConfig.sensors..nonNulls.toList());
+        await filePathBuilder(sensorConfig.sensors.whereNotNull().toList());
     final mediaCapture = MediaCapture.capturing(captureRequest: captureRequest);
     if (!mediaCapture.isPicture) {
       throw ("CaptureRequest must be a picture. ${captureRequest.when(

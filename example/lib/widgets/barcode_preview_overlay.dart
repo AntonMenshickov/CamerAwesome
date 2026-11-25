@@ -7,7 +7,7 @@ class BarcodePreviewOverlay extends StatefulWidget {
   final List<Barcode> barcodes;
   final AnalysisImage? analysisImage;
   final bool isBackCamera;
-  final AnalysisPreview preview;
+  final Preview preview;
 
   const BarcodePreviewOverlay({
     super.key,

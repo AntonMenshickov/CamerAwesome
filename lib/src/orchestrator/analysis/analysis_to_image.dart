@@ -3,14 +3,14 @@ import 'dart:io';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:flutter/material.dart';
 
-class AnalysisPreview {
+class Preview {
   final Size nativePreviewSize;
   final Size previewSize;
   final Offset offset;
   final double scale;
   final Sensor? sensor;
 
-  AnalysisPreview({
+  Preview({
     required this.nativePreviewSize,
     required this.previewSize,
     required this.offset,
@@ -18,7 +18,7 @@ class AnalysisPreview {
     required this.sensor,
   });
 
-  factory AnalysisPreview.hidden() => AnalysisPreview(
+  factory Preview.hidden() => Preview(
         nativePreviewSize: Size.zero,
         previewSize: Size.zero,
         offset: Offset.zero,

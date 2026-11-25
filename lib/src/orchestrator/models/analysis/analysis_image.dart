@@ -88,7 +88,7 @@ abstract class AnalysisImage {
   // Symmetry for Android since native image analysis is not mirrored but preview is
   // It also handles device rotation
   CanvasTransformation? getCanvasTransformation(
-    AnalysisPreview preview,
+    Preview preview,
   ) {
     if (!Platform.isAndroid) {
       return null;

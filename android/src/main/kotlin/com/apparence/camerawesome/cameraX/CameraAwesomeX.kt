@@ -174,7 +174,8 @@ class CameraAwesomeX : CameraInterface, FlutterPlugin, ActivityAware {
             if (zoom > 0) {
                 // TODO Find a better way to set initial zoom than using a postDelayed
                 Handler(Looper.getMainLooper()).postDelayed({
-                    cameraState.setZoom(zoom.toFloat())
+                    (cameraState.concurrentCamera?.cameras?.firstOrNull()
+                        ?: cameraState.previewCamera)?.cameraControl?.setLinearZoom(zoom.toFloat())
                 }, 200)
             }
         }
@@ -197,7 +198,6 @@ class CameraAwesomeX : CameraInterface, FlutterPlugin, ActivityAware {
                         "YUV_420" -> OutputImageFormat.YUV_420_888
                         "NV21" -> OutputImageFormat.NV21
                         "JPEG" -> OutputImageFormat.JPEG
-                        "BGRA8888" -> OutputImageFormat.RGBA_8888
                         else -> OutputImageFormat.NV21
                     },
                     executor(activity!!), width,
@@ -632,7 +632,7 @@ class CameraAwesomeX : CameraInterface, FlutterPlugin, ActivityAware {
     }
 
     override fun setZoom(zoom: Double) {
-        cameraState.setZoom(zoom.toFloat())
+        cameraState.setLinearZoom(zoom.toFloat())
     }
 
     @SuppressLint("RestrictedApi")
@@ -782,18 +782,22 @@ class CameraAwesomeX : CameraInterface, FlutterPlugin, ActivityAware {
 
     @SuppressLint("RestrictedApi")
     override fun getEffectivPreviewSize(index: Long): PreviewSize {
-        val preview = cameraState.previews?.getOrNull(index.toInt()) ?: return PreviewSize(0.0, 0.0)
-        val resolutionInfo = preview.resolutionInfo ?: return PreviewSize(0.0, 0.0)
-        val res = resolutionInfo.resolution
+        val res = cameraState.previews!![index.toInt()].resolutionInfo?.resolution
+        return if (res != null) {
+            val rota90 = 90
+            val rota270 = 270
+            when (cameraState.previews!![index.toInt()].resolutionInfo?.rotationDegrees) {
+                rota90, rota270 -> {
+                    PreviewSize(res.height.toDouble(), res.width.toDouble())
+                }
 
-        val rotation = resolutionInfo.rotationDegrees
-        val previewSize = when (rotation) {
-            90, 270 -> PreviewSize(res.height.toDouble(), res.width.toDouble())
-            else -> PreviewSize(res.width.toDouble(), res.height.toDouble())
+                else -> {
+                    PreviewSize(res.width.toDouble(), res.height.toDouble())
+                }
+            }
+        } else {
+            PreviewSize(0.0, 0.0)
         }
-
-        Log.d("CameraX", "Preview size: width=${previewSize.width}, height=${previewSize.height}, rotation=$rotation")
-        return previewSize
     }
 
     @SuppressLint("RestrictedApi")

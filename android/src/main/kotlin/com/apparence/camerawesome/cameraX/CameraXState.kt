@@ -11,9 +11,6 @@ import androidx.camera.camera2.internal.compat.CameraCharacteristicsCompat
 import androidx.camera.camera2.internal.compat.quirk.CamcorderProfileResolutionQuirk
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.core.*
-import androidx.camera.core.resolutionselector.AspectRatioStrategy
-import androidx.camera.core.resolutionselector.ResolutionSelector
-import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.*
 import androidx.core.content.ContextCompat
@@ -134,7 +131,6 @@ data class CameraXState(
         previews = mutableListOf()
         imageCaptures.clear()
         videoCaptures.clear()
-        val resolutionSelector = getResolutionSelector(aspectRatio ?: AspectRatio.RATIO_4_3)
         if (cameraProvider.isMultiCamSupported() && sensors.size > 1) {
             val singleCameraConfigs = mutableListOf<ConcurrentCamera.SingleCameraConfig>()
             var isFirst = true
@@ -175,20 +171,23 @@ data class CameraXState(
 
                 val preview = if (aspectRatio != null) {
                     Preview.Builder().setTargetAspectRatio(aspectRatio!!)
-                        .build()
+                        .setCameraSelector(cameraSelector).build()
                 } else {
-                    Preview.Builder().build()
+                    Preview.Builder().setCameraSelector(cameraSelector).build()
                 }
-
+                preview.setSurfaceProvider(
+                    surfaceProvider(executor(activity), sensor.deviceId ?: "$index")
+                )
                 useCaseGroupBuilder.addUseCase(preview)
                 previews!!.add(preview)
 
                 if (currentCaptureMode == CaptureModes.PHOTO) {
-                    val imageCapture = ImageCapture.Builder()
+                    val imageCapture = ImageCapture.Builder().setCameraSelector(cameraSelector)
 //                .setJpegQuality(100)
                         .apply {
+                            //photoSize?.let { setTargetResolution(it) }
                             if (rational.denominator != rational.numerator) {
-                                setResolutionSelector(resolutionSelector)
+                                setTargetAspectRatio(aspectRatio ?: AspectRatio.RATIO_4_3)
                             }
 
                             setFlashMode(
@@ -247,11 +246,10 @@ data class CameraXState(
             if (currentCaptureMode != CaptureModes.ANALYSIS_ONLY) {
                 previews!!.add(
                     if (aspectRatio != null) {
-                        Preview.Builder()
-                            .setResolutionSelector(resolutionSelector)
-                            .build()
+                        Preview.Builder().setTargetAspectRatio(aspectRatio!!)
+                            .setCameraSelector(cameraSelector).build()
                     } else {
-                        Preview.Builder().build()
+                        Preview.Builder().setCameraSelector(cameraSelector).build()
                     }
                 )
 
@@ -262,12 +260,12 @@ data class CameraXState(
             }
 
             if (currentCaptureMode == CaptureModes.PHOTO) {
-                val imageCapture = ImageCapture.Builder()
+                val imageCapture = ImageCapture.Builder().setCameraSelector(cameraSelector)
 //                .setJpegQuality(100)
                     .apply {
                         //photoSize?.let { setTargetResolution(it) }
                         if (rational.denominator != rational.numerator) {
-                            setResolutionSelector(resolutionSelector)
+                            setTargetAspectRatio(aspectRatio ?: AspectRatio.RATIO_4_3)
                         }
                         setFlashMode(
                             when (flashMode) {
@@ -319,25 +317,6 @@ data class CameraXState(
         }
     }
 
-    private fun getResolutionSelector(aspectRatio: Int): ResolutionSelector {
-        val resolutionStrategy = when (aspectRatio) {
-            AspectRatio.RATIO_16_9 -> ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY
-            AspectRatio.RATIO_4_3 -> ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY
-            else -> ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY
-        }
-
-        return ResolutionSelector.Builder()
-            .setAspectRatioStrategy(
-                when (aspectRatio) {
-                    AspectRatio.RATIO_16_9 -> AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY
-                    AspectRatio.RATIO_4_3 -> AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY
-                    else -> AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY
-                }
-            )
-            .setResolutionStrategy(resolutionStrategy)
-            .build()
-    }
-
     private fun buildVideoCapture(videoOptions: AndroidVideoOptions?): VideoCapture<Recorder> {
         val recorderBuilder = Recorder.Builder()
         // Aspect ratio is handled by the setViewPort on the UseCaseGroup
@@ -374,12 +353,7 @@ data class CameraXState(
 //        Log.d("SurfaceProviderCamX", "Creating surface provider for $cameraId")
         return Preview.SurfaceProvider { request: SurfaceRequest ->
             val resolution = request.resolution
-            val textureEntry = textureEntries[cameraId] ?: textureEntries.values.firstOrNull()
-            if (textureEntry == null) {
-                request.willNotProvideSurface()
-                return@SurfaceProvider
-            }
-            val texture = textureEntry.surfaceTexture()
+            val texture = textureEntries[cameraId]!!.surfaceTexture()
             texture.setDefaultBufferSize(resolution.width, resolution.height)
             val surface = Surface(texture)
             request.provideSurface(surface, executor) {
@@ -389,13 +363,8 @@ data class CameraXState(
         }
     }
 
-    fun setZoom(normalizedZoom: Float) {
-        val clampedZoom = normalizedZoom.coerceIn(0f, 1f)
-        val zoomState = mainCameraInfos.zoomState.value ?: return
-        val minZoomRatio = zoomState.minZoomRatio
-        val maxZoomRatio = zoomState.maxZoomRatio
-        val targetZoomRatio = minZoomRatio + (maxZoomRatio - minZoomRatio) * clampedZoom
-        mainCameraControl.setZoomRatio(targetZoomRatio)
+    fun setLinearZoom(zoom: Float) {
+        mainCameraControl.setLinearZoom(zoom)
     }
 
     fun startFocusAndMetering(autoFocusAction: FocusMeteringAction) {
