@@ -148,10 +148,11 @@ class CameraAwesomeX : CameraInterface, FlutterPlugin, ActivityAware {
 
         val mode = CaptureModes.valueOf(captureMode)
         cameraState = CameraXState(cameraProvider = cameraProvider,
+            textureRegistry = textureRegistry!!,
             textureEntries = sensors.mapIndexed { index: Int, pigeonSensor: PigeonSensor ->
-                (pigeonSensor.deviceId
-                    ?: index.toString()) to textureRegistry!!.createSurfaceTexture()
-            }.toMap(),
+                val cameraId = pigeonSensor.deviceId ?: index.toString()
+                cameraId to textureRegistry!!.createSurfaceTexture()
+            }.associateTo(mutableMapOf()) { it },
             sensors = sensors,
             mirrorFrontCamera = mirrorFrontCamera,
             currentCaptureMode = mode,
@@ -639,6 +640,7 @@ class CameraAwesomeX : CameraInterface, FlutterPlugin, ActivityAware {
     override fun setSensor(sensors: List<PigeonSensor>) {
         cameraState.apply {
             this.sensors = sensors
+            ensureTextureEntries(sensors)
             // TODO Make below variables parameters
             // Also reset flash mode and aspect ratio
             this.flashMode = FlashMode.NONE
