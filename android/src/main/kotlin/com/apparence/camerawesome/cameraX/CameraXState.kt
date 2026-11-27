@@ -117,15 +117,11 @@ data class CameraXState(
 
     fun ensureTextureEntries(sensors: List<PigeonSensor>) {
         sensors.forEachIndexed { index, sensor ->
-            val cameraId = sensor.deviceId ?: index.toString()
-            if (!textureEntries.containsKey(cameraId)) {
-                textureEntries[cameraId] =
-                    textureRegistry.createSurfaceTexture()
-            }
-            textureEntries.putIfAbsent(
-                index.toString(),
-                textureEntries[cameraId]!!
-            )
+            val position = index.toString()
+            val textureEntry = textureEntries[position]
+                ?: textureRegistry.createSurfaceTexture()
+            textureEntries[position] = textureEntry
+            sensor.deviceId?.let { textureEntries[it] = textureEntry }
         }
     }
 
